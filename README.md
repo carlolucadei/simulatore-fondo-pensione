@@ -26,17 +26,17 @@ Uno strumento web **gratuito, open source e completamente offline** per stimare 
 
 ### Opzione 2 – GitHub Pages
 
-Se vuoi pubblicarlo come sito, basta attivare **GitHub Pages** sulla root del repository e puntare a `simulatore-fondo-pensione.html` come pagina principale (oppure rinominarlo in `index.html`).
+Dato che ho attivato GitHub Pages, se vuoi puoi accedere al simulatore direttamente online all'indirizzo: [https://carlolucadei.github.io/simulatore-fondo-pensione/](https://carlolucadei.github.io/simulatore-fondo-pensione/).
 
 ---
 
 ## 📋 Input richiesti
 
-| Campo | Descrizione |
-|---|---|
-| RAL annuale | Reddito Annuo Lordo in euro |
-| Contributo volontario % | Percentuale della RAL da versare al fondo |
-| Contributo datoriale | Opzionale: importo fisso o percentuale versata dal datore di lavoro |
+| Campo                   | Descrizione                                                         |
+|-------------------------|---------------------------------------------------------------------|
+| RAL annuale             | Reddito Annuo Lordo in euro                                         |
+| Contributo volontario % | Percentuale della RAL da versare al fondo                           |
+| Contributo datoriale    | Opzionale: importo fisso o percentuale versata dal datore di lavoro |
 
 ---
 
@@ -56,17 +56,17 @@ Se vuoi pubblicarlo come sito, basta attivare **GitHub Pages** sulla root del re
 Il file è organizzato in funzioni pure e ben separate, facilmente modificabili:
 
 ```
-calcolaIRPEF()              → calcolo imposta per scaglioni
+calcolaIRPEF()                → calcolo imposta per scaglioni
 calcolaContributoLavoratore() → contributo annuo dalla percentuale
-calcolaQuotaDeducibile()    → applicazione del limite di deducibilità
-calcolaDatoriale()          → contributo del datore di lavoro
-scenarioSenzaFondo()        → scenario base
-scenarioConFondo()          → scenario con deduzione
-renderTabella()             → tabella comparativa
-renderScaglioni()           → dettaglio scaglioni IRPEF
-renderSummary()             → riepilogo qualitativo testuale
-renderKPI()                 → aggiornamento valori in evidenza
-valida()                    → validazione input
+calcolaQuotaDeducibile()      → applicazione del limite di deducibilità
+calcolaDatoriale()            → contributo del datore di lavoro
+scenarioSenzaFondo()          → scenario base
+scenarioConFondo()            → scenario con deduzione
+renderTabella()               → tabella comparativa
+renderScaglioni()             → dettaglio scaglioni IRPEF
+renderSummary()               → riepilogo qualitativo testuale
+renderKPI()                   → aggiornamento valori in evidenza
+valida()                      → validazione input
 ```
 
 Le costanti fiscali (aliquote, soglie, limite di deducibilità) sono tutte definite in cima al file JavaScript in una struttura facilmente aggiornabile:
