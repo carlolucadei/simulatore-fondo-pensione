@@ -586,6 +586,21 @@
         <span class="field-note">Percentuale applicata sulla RAL annua</span>
       </div>
 
+      <!-- VERSAMENTO ESTEMPORANEO (FACOLTATIVO) -->
+      <div class="field">
+        <label>
+          Versamento estemporaneo <small style="font-weight:400;color:var(--gray-400)">(facoltativo)</small>
+          <span class="tooltip-trigger" tabindex="0">?
+            <span class="tooltip-box">Un versamento una tantum, aggiuntivo rispetto ai contributi periodici. Insieme al contributo volontario non può superare il limite annuo di deducibilità di 5.300 €: l'importo eccedente viene ignorato.</span>
+          </span>
+        </label>
+        <div class="input-wrapper">
+          <span class="prefix">€</span>
+          <input type="number" id="extra-versamento" class="has-prefix" min="0" max="5300" step="100" value="0" placeholder="es. 1000" />
+        </div>
+        <span class="field-note" id="extra-note">Importo una tantum in euro</span>
+      </div>
+
       <!-- CONTRIBUTO DATORIALE -->
       <div class="datoriale-wrapper">
         <div class="datoriale-header">
@@ -909,19 +924,30 @@
    * @param {number} totaleFondo
    * @param {number} beneficioTotale
    * @param {number} ral
+   * @param {{importo: number, base: number, risparmio: number}} extra - versamento estemporaneo
    */
   function renderTabella(senza, con, contributoLavoratore, quotaDeducibile,
-                         risparmio, costoNetto, datoriale, totaleFondo, beneficioTotale, ral) {
+                         risparmio, costoNetto, datoriale, totaleFondo, beneficioTotale, ral, extra) {
     const tbody = document.getElementById('tbody-comparativa');
+    const haExtra = extra.importo > 0;
 
     // Righe: [etichetta, valoreSenza, valoreCon, highlightRow]
     const righe = [
       ['Reddito lordo / RAL',                    ral,                    ral,              false],
-      ['Contributo volontario lavoratore',        '—',                    contributoLavoratore, false],
+      ...(haExtra ? [
+        ['Contributo volontario periodico',       '—',                    extra.base,       false],
+        ['Versamento estemporaneo',               '—',                    extra.importo,    false],
+        ['Totale contributi lavoratore',          '—',                    contributoLavoratore, false],
+      ] : [
+        ['Contributo volontario lavoratore',      '—',                    contributoLavoratore, false],
+      ]),
       ['Quota deducibile effettiva',              '—',                    quotaDeducibile,  quotaDeducibile < contributoLavoratore ? 'cap' : false],
       ['Reddito imponibile IRPEF',                senza.imponibile,       con.imponibile,   false],
       ['IRPEF totale stimata',                    senza.irpef,            con.irpef,        false],
       ['RISPARMIO FISCALE ANNUO',                 '—',                    risparmio,        true],
+      ...(haExtra ? [
+        ['di cui dovuto al versamento estemporaneo', '—',                 extra.risparmio,  false],
+      ] : []),
       ['Costo netto effettivo del contributo',    '—',                    costoNetto,       false],
       ...(datoriale > 0 ? [
         ['Contributo del datore di lavoro',       '—',                    datoriale,        false],
@@ -1008,7 +1034,7 @@
    * Genera i punti del riepilogo testuale.
    */
   function renderSummary(ral, senza, con, contributoLavoratore, quotaDeducibile,
-                          risparmio, costoNetto, datoriale, totaleFondo, beneficioTotale) {
+                          risparmio, costoNetto, datoriale, totaleFondo, beneficioTotale, extra) {
     const ul    = document.getElementById('summary-list');
     const items = [];
 
@@ -1018,8 +1044,13 @@
     // 2. Risparmio
     items.push(`Il <span class="summary-em">risparmio fiscale stimato è pari a ${fEuro(risparmio)}</span> annui.`);
 
+    // 2b. Versamento estemporaneo
+    if (extra.importo > 0) {
+      items.push(`Il <span class="summary-em">versamento estemporaneo di ${fEuro(extra.importo)}</span> ti fa risparmiare ulteriori <span class="summary-em">${fEuro(extra.risparmio)}</span> di IRPEF, per un costo netto di <span class="summary-em">${fEuro(extra.importo - extra.risparmio)}</span>.`);
+    }
+
     // 3. Costo netto
-    items.push(`A fronte di un versamento lordo di <span class="summary-em">${fEuro(contributoLavoratore)}</span>, il <span class="summary-em">costo netto effettivo per il lavoratore è pari a ${fEuro(costoNetto)}</span>.`);
+    items.push(`A fronte di un versamento lordo di <span class="summary-em">${fEuro(contributoLavoratore)}</span>${extra.importo > 0 ? ' (periodico + estemporaneo)' : ''}, il <span class="summary-em">costo netto effettivo per il lavoratore è pari a ${fEuro(costoNetto)}</span>.`);
 
     // 4. Cap deducibilità
     if (contributoLavoratore > LIMITE_DEDUCIBILITA) {
@@ -1061,7 +1092,7 @@
   /**
    * Valida gli input, restituisce { valido, messaggioErrore, messaggioWarning }.
    */
-  function valida(ral, percLavoratore, tipoDatoriale, valoreDatoriale) {
+  function valida(ral, percLavoratore, tipoDatoriale, valoreDatoriale, extraRichiesto) {
     if (!ral || ral <= 0) {
       return { valido: false, errore: 'Inserisci un valore valido per la RAL (deve essere maggiore di zero).' };
     }
@@ -1080,12 +1111,26 @@
       }
     }
 
+    if (extraRichiesto < 0) {
+      return { valido: false, errore: 'Il versamento estemporaneo non può essere negativo.' };
+    }
+
     // Warning: contributo supera il limite deducibile
     const contributo = ral * (percLavoratore / 100);
     if (contributo > LIMITE_DEDUCIBILITA) {
       return {
         valido: true,
-        warning: `Il contributo volontario calcolato (${fEuro(contributo)}) supera il limite annuo deducibile di ${fEuro(LIMITE_DEDUCIBILITA)}. La quota deducibile sarà limitata a ${fEuro(LIMITE_DEDUCIBILITA)}.`
+        warning: `Il contributo volontario calcolato (${fEuro(contributo)}) supera il limite annuo deducibile di ${fEuro(LIMITE_DEDUCIBILITA)}. La quota deducibile sarà limitata a ${fEuro(LIMITE_DEDUCIBILITA)}.` +
+          (extraRichiesto > 0 ? ' Non c\'è margine per il versamento estemporaneo, che viene ignorato.' : '')
+      };
+    }
+
+    // Warning: contributo + versamento estemporaneo superano il limite
+    const residuo = LIMITE_DEDUCIBILITA - contributo;
+    if (extraRichiesto > residuo) {
+      return {
+        valido: true,
+        warning: `Contributo volontario e versamento estemporaneo non possono superare ${fEuro(LIMITE_DEDUCIBILITA)} complessivi: il versamento estemporaneo è stato limitato a ${fEuro(residuo)}.`
       };
     }
 
@@ -1133,8 +1178,9 @@
     const percLavoratore   = parseFloat(document.getElementById('perc-lavoratore').value) || 0;
     const tipoDatoriale    = document.getElementById('tipo-datoriale').value;
     const valoreDatoriale  = parseFloat(document.getElementById('valore-datoriale').value) || 0;
+    const extraRichiesto   = parseFloat(document.getElementById('extra-versamento').value) || 0;
 
-    const validazione = valida(ral, percLavoratore, tipoDatoriale, valoreDatoriale);
+    const validazione = valida(ral, percLavoratore, tipoDatoriale, valoreDatoriale, extraRichiesto);
     const validationBar = document.getElementById('validation-bar');
     const results       = document.getElementById('results');
 
@@ -1154,12 +1200,30 @@
     }
 
     // --- Calcoli ---
-    const contributoLavoratore = calcolaContributoLavoratore(ral, percLavoratore);
+    const contributoBase  = calcolaContributoLavoratore(ral, percLavoratore);
+    const margineResiduo  = Math.max(0, LIMITE_DEDUCIBILITA - contributoBase);
+    const extraEffettivo  = Math.min(extraRichiesto, margineResiduo);
+    const contributoLavoratore = contributoBase + extraEffettivo;
     const quotaDeducibile      = calcolaQuotaDeducibile(contributoLavoratore);
     const datoriale            = calcolaDatoriale(tipoDatoriale, valoreDatoriale, ral);
 
     const senza = scenarioSenzaFondo(ral);
     const con   = scenarioConFondo(ral, contributoLavoratore, quotaDeducibile);
+
+    // Risparmio attribuibile al solo versamento estemporaneo (rispetto al contributo periodico)
+    const senzaExtra = scenarioConFondo(ral, contributoBase, calcolaQuotaDeducibile(contributoBase));
+    const extra = {
+      importo:   extraEffettivo,
+      base:      contributoBase,
+      risparmio: senzaExtra.irpef - con.irpef,
+    };
+
+    // Aggiorna sottotitolo KPI e margine ancora disponibile per il versamento estemporaneo
+    document.getElementById('kpi-contributo-sub').textContent =
+      extraEffettivo > 0 ? 'Periodico + versamento estemporaneo' : 'Versato annualmente al fondo';
+    document.getElementById('extra-note').textContent =
+      `Margine ancora disponibile: ${fEuro(margineResiduo)} (limite ${fEuro(LIMITE_DEDUCIBILITA)} complessivo)`;
+    document.getElementById('extra-versamento').max = String(margineResiduo);
 
     const risparmio       = senza.irpef - con.irpef;
     const costoNetto      = contributoLavoratore - risparmio;
@@ -1169,10 +1233,10 @@
     // --- Rendering ---
     renderKPI(contributoLavoratore, risparmio, costoNetto, totaleFondo, datoriale);
     renderTabella(senza, con, contributoLavoratore, quotaDeducibile,
-                  risparmio, costoNetto, datoriale, totaleFondo, beneficioTotale, ral);
+                  risparmio, costoNetto, datoriale, totaleFondo, beneficioTotale, ral, extra);
     renderScaglioni(senza, con);
     renderSummary(ral, senza, con, contributoLavoratore, quotaDeducibile,
-                  risparmio, costoNetto, datoriale, totaleFondo, beneficioTotale);
+                  risparmio, costoNetto, datoriale, totaleFondo, beneficioTotale, extra);
 
     results.classList.add('visible');
   }
@@ -1181,7 +1245,7 @@
      EVENT LISTENERS
   ============================================================== */
   // Aggiorna al cambio di ogni input
-  ['ral', 'perc-lavoratore', 'valore-datoriale'].forEach(id => {
+  ['ral', 'perc-lavoratore', 'extra-versamento', 'valore-datoriale'].forEach(id => {
     document.getElementById(id).addEventListener('input', aggiorna);
   });
 
