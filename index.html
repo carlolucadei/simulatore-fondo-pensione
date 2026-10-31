@@ -591,7 +591,7 @@
         <label>
           Versamento estemporaneo <small style="font-weight:400;color:var(--gray-400)">(facoltativo)</small>
           <span class="tooltip-trigger" tabindex="0">?
-            <span class="tooltip-box">Un versamento una tantum, aggiuntivo rispetto ai contributi periodici. Insieme al contributo volontario non può superare il limite annuo di deducibilità di 5.300 €: l'importo eccedente viene ignorato.</span>
+            <span class="tooltip-box">Un versamento una tantum, aggiuntivo rispetto ai contributi periodici. Insieme al contributo volontario e a quello del datore di lavoro (TFR escluso) non può superare il limite annuo di deducibilità di 5.300 €: l'importo eccedente viene ignorato.</span>
           </span>
         </label>
         <div class="input-wrapper">
@@ -607,7 +607,7 @@
           <label>
             Contributo del datore di lavoro
             <span class="tooltip-trigger" tabindex="0">?
-              <span class="tooltip-box">Il contributo che il tuo datore di lavoro versa nel fondo pensione. Non riduce l'IRPEF del lavoratore, ma aumenta il capitale accumulato nel fondo.</span>
+              <span class="tooltip-box">Il contributo che il tuo datore di lavoro versa nel fondo pensione. Non riduce l'IRPEF del lavoratore, ma aumenta il capitale accumulato nel fondo. Conta nel limite annuo di deducibilità di 5.300 € (insieme ai tuoi versamenti), mentre il TFR ne è escluso.</span>
             </span>
           </label>
           <select id="tipo-datoriale" style="width: auto; padding: 6px 12px; font-size: 0.82rem;">
@@ -847,12 +847,23 @@
      APPLICAZIONE LIMITE DI DEDUCIBILITÀ
   ============================================================== */
   /**
-   * Restituisce la quota effettivamente deducibile (min tra contributo e limite).
-   * @param {number} contributo
+   * Il limite annuo di deducibilità comprende contributi del lavoratore e del datore
+   * (TFR escluso): restituisce la quota di limite ancora disponibile per il lavoratore.
+   * @param {number} datoriale - contributo datoriale annuo in euro
    * @returns {number}
    */
-  function calcolaQuotaDeducibile(contributo) {
-    return Math.min(contributo, LIMITE_DEDUCIBILITA);
+  function limiteLavoratore(datoriale) {
+    return Math.max(0, LIMITE_DEDUCIBILITA - datoriale);
+  }
+
+  /**
+   * Restituisce la quota effettivamente deducibile (min tra contributo e limite residuo).
+   * @param {number} contributo - contributo del lavoratore (periodico + estemporaneo)
+   * @param {number} datoriale
+   * @returns {number}
+   */
+  function calcolaQuotaDeducibile(contributo, datoriale) {
+    return Math.min(contributo, limiteLavoratore(datoriale));
   }
 
   /* ==============================================================
@@ -1053,8 +1064,8 @@
     items.push(`A fronte di un versamento lordo di <span class="summary-em">${fEuro(contributoLavoratore)}</span>${extra.importo > 0 ? ' (periodico + estemporaneo)' : ''}, il <span class="summary-em">costo netto effettivo per il lavoratore è pari a ${fEuro(costoNetto)}</span>.`);
 
     // 4. Cap deducibilità
-    if (contributoLavoratore > LIMITE_DEDUCIBILITA) {
-      items.push(`Il contributo supera il limite annuo deducibile di <span class="summary-em">${fEuro(LIMITE_DEDUCIBILITA)}</span>: solo questa quota riduce l'IRPEF, il resto è versato ma non genera ulteriore risparmio fiscale.`);
+    if (quotaDeducibile < contributoLavoratore) {
+      items.push(`Il limite annuo deducibile di <span class="summary-em">${fEuro(LIMITE_DEDUCIBILITA)}</span> comprende anche il contributo del datore di lavoro (${fEuro(datoriale)}): al lavoratore restano <span class="summary-em">${fEuro(quotaDeducibile)}</span> deducibili. Solo questa quota riduce l'IRPEF, il resto è versato ma non genera ulteriore risparmio fiscale.`);
     }
 
     // 5. Datoriale
@@ -1115,22 +1126,28 @@
       return { valido: false, errore: 'Il versamento estemporaneo non può essere negativo.' };
     }
 
+    // Il limite comprende anche il contributo datoriale (TFR escluso)
+    const datoriale = calcolaDatoriale(tipoDatoriale, valoreDatoriale, ral);
+    const limite    = limiteLavoratore(datoriale);
+    const compresoDatoriale = datoriale > 0
+      ? ` (${fEuro(LIMITE_DEDUCIBILITA)} meno ${fEuro(datoriale)} di contributo datoriale)` : '';
+
     // Warning: contributo supera il limite deducibile
     const contributo = ral * (percLavoratore / 100);
-    if (contributo > LIMITE_DEDUCIBILITA) {
+    if (contributo > limite) {
       return {
         valido: true,
-        warning: `Il contributo volontario calcolato (${fEuro(contributo)}) supera il limite annuo deducibile di ${fEuro(LIMITE_DEDUCIBILITA)}. La quota deducibile sarà limitata a ${fEuro(LIMITE_DEDUCIBILITA)}.` +
+        warning: `Il contributo volontario calcolato (${fEuro(contributo)}) supera il limite annuo deducibile per il lavoratore di ${fEuro(limite)}${compresoDatoriale}. La quota deducibile sarà limitata a ${fEuro(limite)}.` +
           (extraRichiesto > 0 ? ' Non c\'è margine per il versamento estemporaneo, che viene ignorato.' : '')
       };
     }
 
     // Warning: contributo + versamento estemporaneo superano il limite
-    const residuo = LIMITE_DEDUCIBILITA - contributo;
+    const residuo = limite - contributo;
     if (extraRichiesto > residuo) {
       return {
         valido: true,
-        warning: `Contributo volontario e versamento estemporaneo non possono superare ${fEuro(LIMITE_DEDUCIBILITA)} complessivi: il versamento estemporaneo è stato limitato a ${fEuro(residuo)}.`
+        warning: `Contributo volontario, versamento estemporaneo e contributo datoriale non possono superare ${fEuro(LIMITE_DEDUCIBILITA)} complessivi: il versamento estemporaneo è stato limitato a ${fEuro(residuo)}.`
       };
     }
 
@@ -1201,17 +1218,17 @@
 
     // --- Calcoli ---
     const contributoBase  = calcolaContributoLavoratore(ral, percLavoratore);
-    const margineResiduo  = Math.max(0, LIMITE_DEDUCIBILITA - contributoBase);
+    const datoriale       = calcolaDatoriale(tipoDatoriale, valoreDatoriale, ral);
+    const margineResiduo  = Math.max(0, limiteLavoratore(datoriale) - contributoBase);
     const extraEffettivo  = Math.min(extraRichiesto, margineResiduo);
     const contributoLavoratore = contributoBase + extraEffettivo;
-    const quotaDeducibile      = calcolaQuotaDeducibile(contributoLavoratore);
-    const datoriale            = calcolaDatoriale(tipoDatoriale, valoreDatoriale, ral);
+    const quotaDeducibile      = calcolaQuotaDeducibile(contributoLavoratore, datoriale);
 
     const senza = scenarioSenzaFondo(ral);
     const con   = scenarioConFondo(ral, contributoLavoratore, quotaDeducibile);
 
     // Risparmio attribuibile al solo versamento estemporaneo (rispetto al contributo periodico)
-    const senzaExtra = scenarioConFondo(ral, contributoBase, calcolaQuotaDeducibile(contributoBase));
+    const senzaExtra = scenarioConFondo(ral, contributoBase, calcolaQuotaDeducibile(contributoBase, datoriale));
     const extra = {
       importo:   extraEffettivo,
       base:      contributoBase,
@@ -1222,7 +1239,7 @@
     document.getElementById('kpi-contributo-sub').textContent =
       extraEffettivo > 0 ? 'Periodico + versamento estemporaneo' : 'Versato annualmente al fondo';
     document.getElementById('extra-note').textContent =
-      `Margine ancora disponibile: ${fEuro(margineResiduo)} (limite ${fEuro(LIMITE_DEDUCIBILITA)} complessivo)`;
+      `Margine ancora disponibile: ${fEuro(margineResiduo)} (limite ${fEuro(LIMITE_DEDUCIBILITA)} comprensivo del contributo datoriale)`;
     document.getElementById('extra-versamento').max = String(margineResiduo);
 
     const risparmio       = senza.irpef - con.irpef;

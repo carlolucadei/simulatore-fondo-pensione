@@ -7,8 +7,9 @@ Uno strumento web **gratuito, open source e completamente offline** per stimare 
 ## ✨ Funzionalità
 
 - Calcolo IRPEF per scaglioni (23% / 33% / 43%) applicato a due scenari: con e senza fondo pensione
-- Deduzione automatica del contributo volontario con applicazione del limite massimo annuo
+- Deduzione automatica del contributo volontario con applicazione del limite massimo annuo (5.300 €), che comprende anche il contributo datoriale (TFR escluso)
 - Supporto al contributo datoriale (in percentuale sulla RAL o importo fisso)
+- Versamento volontario estemporaneo facoltativo, con il risparmio fiscale che gli è attribuibile; viene ridotto automaticamente per non superare il limite annuo
 - Tabella comparativa con dettaglio per scaglione
 - Riepilogo qualitativo in linguaggio semplice, generato dinamicamente
 - Validazione degli input con messaggi chiari
@@ -36,6 +37,7 @@ Dato che ho attivato GitHub Pages, se vuoi puoi accedere al simulatore direttame
 |-------------------------|---------------------------------------------------------------------|
 | RAL annuale             | Reddito Annuo Lordo in euro                                         |
 | Contributo volontario % | Percentuale della RAL da versare al fondo                           |
+| Versamento estemporaneo | Opzionale: importo una tantum in euro, entro il margine del limite di 5.300 € (che include periodico e datoriale) |
 | Contributo datoriale    | Opzionale: importo fisso o percentuale versata dal datore di lavoro |
 
 ---
@@ -44,9 +46,9 @@ Dato che ho attivato GitHub Pages, se vuoi puoi accedere al simulatore direttame
 
 - IRPEF stimata nei due scenari (senza / con fondo pensione)
 - Dettaglio dell'imposta per ciascuno scaglione IRPEF
-- Risparmio fiscale annuo
+- Risparmio fiscale annuo, con la quota dovuta al versamento estemporaneo
 - Costo netto effettivo del contributo (versato meno risparmio)
-- Totale annuo versato nel fondo (lavoratore + datore)
+- Totale annuo versato nel fondo (lavoratore, estemporaneo e datore)
 - Beneficio economico complessivo stimato
 
 ---
@@ -58,6 +60,7 @@ Il file è organizzato in funzioni pure e ben separate, facilmente modificabili:
 ```
 calcolaIRPEF()                → calcolo imposta per scaglioni
 calcolaContributoLavoratore() → contributo annuo dalla percentuale
+limiteLavoratore()            → limite di deducibilità residuo (5.300 € meno contributo datoriale)
 calcolaQuotaDeducibile()      → applicazione del limite di deducibilità
 calcolaDatoriale()            → contributo del datore di lavoro
 scenarioSenzaFondo()          → scenario base
